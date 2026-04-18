@@ -5,26 +5,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Django sets DATABASE_URL as a postgres:// URL; SQLAlchemy needs postgresql+asyncpg://
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set.")
+    raise ValueError(
+        "DATABASE_URL is not set.\n"
+        "For local dev, add this to smart-finder-fastapi/.env:\n"
+        "  DATABASE_URL=sqlite+aiosqlite:///../smart-finder-backend/db.sqlite3\n"
+        "For Render, it is injected automatically from the PostgreSQL service."
+    )
 
-# Render provides postgres:// — convert to postgresql+asyncpg://
+# ── Driver normalisation ───────────────────────────────────────────────────────
+# Render gives postgres:// → convert to postgresql+asyncpg://
+# Local SQLite URL stays as sqlite+aiosqlite:// — no change needed
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+# ── Engine config ─────────────────────────────────────────────────────────────
+# SQLite does not support connection pooling — different config from PostgreSQL
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,       # Set True during local debugging to see SQL
-    pool_size=5,
-    max_overflow=10,
-    pool_pre_ping=True,  # Automatically reconnect on stale connections
-)
+if IS_SQLITE:
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        connect_args={"check_same_thread": False},  # Required for SQLite
+    )
+else:
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_size=5,
+        max_overflow=10,
+        pool_pre_ping=True,
+    )
 
 AsyncSessionLocal = sessionmaker(
     bind=engine,

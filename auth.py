@@ -5,24 +5,42 @@ the shared authtoken_token table. FastAPI accepts the same
 """
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
 from models import AuthToken, AuthUser
 
-security = HTTPBearer(scheme_name="Django Token Auth")
+# We use APIKeyHeader to read the raw "Authorization" header.
+# This prevents FastAPI from rejecting the Django "Token <key>" format.
+security = APIKeyHeader(name="Authorization", auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_header: str = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> AuthUser:
     """
     Validates a Django DRF token from the Authorization header.
     Returns the associated user or raises 401.
     """
-    token_key = credentials.credentials
+    if not auth_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header. Format should be: Token <key>"
+        )
+
+    # Allow formats: "Token <key>", "Bearer <key>", or just "<key>" from Swagger UI
+    parts = auth_header.split()
+    if len(parts) == 2 and parts[0].lower() in ("token", "bearer"):
+        token_key = parts[1]
+    elif len(parts) == 1:
+        token_key = parts[0]
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token format. Expected: Token <key>"
+        )
 
     # Look up the token in Django's authtoken_token table
     result = await db.execute(
@@ -34,7 +52,6 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token.",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Fetch the associated user
