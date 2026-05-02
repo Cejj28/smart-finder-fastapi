@@ -68,3 +68,12 @@ class RecentItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ── ML Predictions ────────────────────────────────────────────────────────────
+
+class InputData(BaseModel):
+    text: str # [cite: 73]
+
+class OutputData(BaseModel):
+    label: str # [cite: 75]
+    score: float # [cite: 76]
