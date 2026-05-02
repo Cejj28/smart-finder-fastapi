@@ -71,9 +71,23 @@ class RecentItem(BaseModel):
 
 # ── ML Predictions ────────────────────────────────────────────────────────────
 
-class InputData(BaseModel):
-    text: str # [cite: 73]
+class CategoryInput(BaseModel):
+    item_name: str
+    description: Optional[str] = ""
 
-class OutputData(BaseModel):
-    label: str # [cite: 75]
-    score: float # [cite: 76]
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "item_name": "black leather wallet",
+                    "description": "lost near the canteen, has ID cards inside"
+                }
+            ]
+        }
+    }
+
+
+class CategoryOutput(BaseModel):
+    category: str
+    confidence: float
+    all_scores: dict[str, float]

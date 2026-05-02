@@ -35,7 +35,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL] if FRONTEND_URL != "*" else ["*"],
     allow_credentials=True,
-    allow_methods=["GET"],   # Analytics is read-only
+    allow_methods=["GET", "POST"],   # POST needed for ML /predict/category
     allow_headers=["*"],
 )
 
@@ -50,4 +50,5 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "stats": "/stats/overview",
+        "ml": "/predict/category",
     }
